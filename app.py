@@ -17,6 +17,21 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Define um prompt de sistema que descreve as regras e comportamento do assistente de IA
+CUSTOM_PROMPT = """
+Você é o "Ramos AI Coder", um assistente de IA especialista em programação, com foco principal em Python. Sua missão é ajudar desenvolvedores iniciantes com dúvidas de programação de forma clara, precisa e útil.
+
+REGRAS DE OPERAÇÃO:
+1.  **Foco em Programação**: Responda apenas a perguntas relacionadas a programação, algoritmos, estruturas de dados, bibliotecas e frameworks. Se o usuário perguntar sobre outro assunto, responda educadamente que seu foco é exclusivamente em auxiliar com código.
+2.  **Estrutura da Resposta**: Sempre formate suas respostas da seguinte maneira:
+    * **Explicação Clara**: Comece com uma explicação conceitual sobre o tópico perguntado. Seja direto e didático.
+    * **Exemplo de Código**: Forneça um ou mais blocos de código em Python com a sintaxe correta. O código deve ser bem comentado para explicar as partes importantes.
+    * **Detalhes do Código**: Após o bloco de código, descreva em detalhes o que cada parte do código faz, explicando a lógica e as funções utilizadas.
+    * **Documentação de Referência**: Ao final, inclua uma seção chamada "📚 Documentação de Referência" com um link direto e relevante para a documentação oficial da Linguagem Python (docs.python.org) ou da biblioteca em questão.
+3.  **Clareza e Precisão**: Use uma linguagem clara. Evite jargões desnecessários. Suas respostas devem ser tecnicamente precisas.
+"""
+
+
 # Cria o comando da barra lateral no streamlit
 with st.sidebar:
     # Define o título da barra lateral
@@ -35,18 +50,18 @@ with st.sidebar:
     st.markdown("-----")
     st.markdown("Desenvolvido para auxiliar em suas dúvidas de programação com linguagem Python. A IA pode cometer erros. Sempre verifique as respostas.")
     st.markdown("-----")
-    st.markdown("Conheças mais dos meus projetos em meu perfil.")
+    st.markdown("Conheça mais dos meus projetos em meu perfil.")
 
     # Link para o meu perfil
     st.markdown("🔗[Ramos Code](https://github.com/kaia-boo)")
     # Botão de link para enviar ao suporte
-    st.link_button("E-mail para o suporte no Caso de dúvidas", "linkdoemailaqui")
+    st.link_button("E-mail para o suporte no Caso de dúvidas","mailto:seuemail@gmail.com")
 
 # Título principal do App
 st.title(" Kaia-Boo - RAMOS AI CODER 💻")
 
 # Subtítulo adicional
-st.title(" 🐍 Assistente Pessoal de Programação Python 🐍 ")
+st.subheader("🐍 Assistente Pessoal de Programação Python 🐍")
 
 # Texto auxiliar abaixo do título
 st.caption("Faça sua pergunta sobre linguagem Python e obtenha código, explicações e referências.")
@@ -56,7 +71,76 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # Exibir todas as mensagens anteriores armazenadas no estado da sessão
-for mesage in st.session_state.messages:
+for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
+
+
+# Inicia a Variável do cliente Groq como none 
+client = None
+
+# Verifica se o usuário forneceu a chave API da Groq
+if groq_api_key:
+    try: 
+        # Cria cliente Groq com a chave API fornecida
+        client = Groq(api_key=groq_api_key)
+
+    except Exception as e:
+
+        # Exibi uma mensagem de erro, caso haja problema ao incializar o cliente
+        st.sidebar.error(f"Erro ao Inicializar o cliente Groq: {e}")
+        st.stop()
+# Caso não tenha chave, mas já existam mensagens, mostra aviso
+
+elif st.session_state.messages:
+    st.warning ("Por favor, Insira sua API Key da Groq na Barra lateral para continuar.")
+
+# Captura a entrada do usuário no chat
+if prompt := st.chat_input("Qual sua dúvida sobre Python?"):
+    
+    # Se não houver cliente válido, mostra aviso e para a execução
+    if not client:
+        st.warning("Por favor, insira sua API Key da Groq na barra lateral para começar.")
+        st.stop()
+
+    # Armazena a mensagem do usuário no estado da sessão
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    
+    # Exibe a mensagem do usuário no chat
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # Prepara mensagens para enviar à API, incluindo prompt de sistema
+    messages_for_api = [{"role": "system", "content": CUSTOM_PROMPT}]
+    for msg in st.session_state.messages:
         
+        messages_for_api.append(msg)
+
+    # Cria a resposta do assistente no chat
+    with st.chat_message("assistant"):
+        
+        with st.spinner("Analisando sua pergunta..."):
+            
+            try:
+                
+                # Chama a API da Groq para gerar a resposta do assistente
+                chat_completion = client.chat.completions.create(
+                    messages = messages_for_api,
+                    model = "openai/gpt-oss-20b", 
+                    temperature = 0.7,
+                    max_tokens = 2048,
+                )
+                
+                # Extrai a resposta gerada pela API
+                ramos_ai_response = chat_completion.choices[0].message.content
+                
+                # Exibe a resposta no Streamlit
+                st.markdown(ramos_ai_response)
+                
+                # Armazena resposta do assistente no estado da sessão
+                st.session_state.messages.append({"role": "assistant", "content": ramos_ai_response})
+
+            # Caso ocorra erro na comunicação com a API, exibe mensagem de erro
+            except Exception as e:
+                st.error(f"Ocorreu um erro ao se comunicar com a API da Groq: {e}")
+
